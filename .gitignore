@@ -1,0 +1,31 @@
+# Media directories
+downloads
+movies
+tv
+watch
+anime
+
+# Test directories
+downloads_test/
+config_test/
+*_test/
+
+# Test scripts
+test-cleanup-service.sh
+direct-test.sh
+*-test.sh
+
+# Keep these specific configuration files
+!config/**/config.xml
+!config/**/settings.json
+!config/**/*.yml
+!config/**/*.yaml
+!config/**/Definitions/
+
+#
+config
+
+
+# Docker temp files
+Dockerfile.test
+.dockerignore

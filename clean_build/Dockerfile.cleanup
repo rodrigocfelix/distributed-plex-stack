@@ -1,0 +1,20 @@
+FROM alpine:latest
+
+# Install cron
+RUN apk add --no-cache dcron
+
+# Create config directory (good practice even though it will be mounted)
+# This ensures the container can still function if the volume mount fails
+RUN mkdir -p /config
+
+# Copy our cleanup script
+COPY cleanup-script.sh /usr/local/bin/cleanup-script.sh
+RUN chmod +x /usr/local/bin/cleanup-script.sh
+
+# Setup cron job to run daily at midnight
+# The cleanup script will log its activities to /config/cleanup.log
+# /config is mounted from the host for persistent logging
+RUN echo "0 0 * * * /usr/local/bin/cleanup-script.sh" > /etc/crontabs/root
+
+# Start cron in foreground
+CMD ["crond", "-f", "-d", "8"]

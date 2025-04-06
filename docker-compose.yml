@@ -1,0 +1,222 @@
+version: '3'
+
+# Enable BuildKit for all build operations to avoid legacy builder deprecation warning
+x-build-options: &build-options
+  args:
+    - DOCKER_BUILDKIT=1
+
+services:
+  # Test version of Downloads Cleanup Service (commented out to disable)
+  # downloads-cleanup-test:
+  #   build:
+  #     context: ./cleanup-service
+  #   container_name: downloads-cleanup-test
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - TZ=Europe/Lisbon
+  #     - RETENTION_DAYS=1  # Use 1 day for testing
+  #     - CONFIG_PATH=/config
+  #     - CLEANUP_DIRS=/downloads_test/complete,/downloads_test/incomplete  # Test directories
+  #     - CRON_SCHEDULE=* * * * *  # Run every minute for testing
+  #   volumes:
+  #     - ./config_test:/config
+  #     - ./downloads_test:/downloads_test
+  #   restart: "no"  # Don't restart for testing
+
+  # Portainer - Docker Management UI
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/portainer:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  # Downloads Cleanup Service
+  downloads-cleanup:
+    build:
+      context: ./cleanup-service
+    container_name: downloads-cleanup
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+      - RETENTION_DAYS=30  # How many days to keep files (default: 30)
+      - CONFIG_PATH=/config  # Where to store logs
+      - CLEANUP_DIRS=/downloads/complete,/downloads/incomplete  # Directories to clean (comma-separated)
+      - CRON_SCHEDULE=0 5 * * *  # When to run cleanup (default: 5 AM)
+    volumes:
+      - ./config/downloads-cleanup:/config
+      - ./downloads:/downloads
+    restart: unless-stopped
+    depends_on:
+      - transmission
+
+  # Transmission - Torrent Downloader
+  transmission:
+    image: linuxserver/transmission:latest
+    container_name: transmission
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+#      - TRANSMISSION_WEB_HOME=/combustion-release/ #optional
+    volumes:
+      - ./config/transmission:/config
+      - ./downloads:/downloads
+      - ./watch:/watch
+    # ports:
+    #   - "9091:9091"
+    #   - "51413:51413"
+    #   - "51413:51413/udp"
+    restart: unless-stopped
+  #  networks:
+  #    - plex-network
+
+  # Sonarr - TV Series Management
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+    volumes:
+      - ./config/sonarr:/config
+      - ./tv:/tv
+      - ./downloads:/downloads
+      - ./anime:/anime
+    # ports:
+    #   - "8989:8989"
+    restart: unless-stopped
+  #  networks:
+  #    - plex-network
+    depends_on:
+      - transmission
+
+  # Radarr - Movie Management
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+    volumes:
+      - ./config/radarr:/config
+      - ./movies:/movies
+      - ./downloads:/downloads
+    # ports:
+    #   - "7878:7878"
+    restart: unless-stopped
+    # networks:
+    #   - plex-network
+    depends_on:
+      - transmission
+
+  # Overseerr - Media Requests
+  overseerr:
+    image: linuxserver/overseerr:latest
+    container_name: overseerr
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+    volumes:
+      - ./config/overseerr:/config
+      - ./movies:/movies
+      - ./tv:/tv
+      - ./anime:/anime
+    # ports:
+    #   - "5055:5055"
+    restart: unless-stopped
+    # networks:
+    #   - plex-network
+    depends_on:
+      - radarr
+      - sonarr
+
+  # Bazarr - Subtitle Management
+  bazarr:
+    image: linuxserver/bazarr:latest
+    container_name: bazarr
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+    volumes:
+      - ./config/bazarr:/config
+      - ./movies:/movies
+      - ./tv:/tv
+      - ./anime:/anime
+    # ports:
+    #   - "6767:6767"
+    restart: unless-stopped
+    # networks:
+    #   - plex-network
+    depends_on:
+      - radarr
+      - sonarr
+
+  # FlareSolverr - Captcha Solving
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: host
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Europe/Lisbon
+      - CAPTCHA_SOLVER=none
+    # ports:
+    #   - "8191:8191"
+    restart: unless-stopped
+    # networks:
+    #   - plex-network
+      
+  # Prowlarr - Indexer Manager
+  prowlarr:
+    image: linuxserver/prowlarr:latest
+    container_name: prowlarr
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+    volumes:
+      - ./config/prowlarr:/config
+    # ports:
+    #   - "9696:9696"
+    restart: unless-stopped
+    # networks:
+    #   - plex-network
+
+  # Plex Media Server
+  plex:
+    image: linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Lisbon
+      - VERSION=docker
+#      - PLEX_CLAIM= #optional
+    volumes:
+      - ./config/plex:/config
+      - ./tv:/tv
+      - ./movies:/movies
+      - ./anime:/anime
+    restart: unless-stopped
+
+# networks:
+#   plex-network:
+#     driver: bridge
