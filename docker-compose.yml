@@ -1,11 +1,26 @@
-version: '3'
-
 # Enable BuildKit for all build operations to avoid legacy builder deprecation warning
 x-build-options: &build-options
   args:
     - DOCKER_BUILDKIT=1
 
 services:
+  # Tailscale healthcheck service
+  tailscale-check:
+    image: alpine:latest
+    container_name: tailscale-check
+    network_mode: host
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+      apk add --no-cache curl;
+      until curl -s ifconfig.co/country | grep -q 'Switzerland';
+      do 
+        echo 'Waiting for Tailscale exit node to route through Switzerland...';
+        sleep 5;
+      done;
+      echo 'Tailscale is correctly routing through Switzerland!';
+      "
+
   # Test version of Downloads Cleanup Service (commented out to disable)
   # downloads-cleanup-test:
   #   build:
@@ -51,7 +66,7 @@ services:
       - CRON_SCHEDULE=0 5 * * *  # When to run cleanup (default: 5 AM)
     volumes:
       - ./config/downloads-cleanup:/config
-      - ./downloads:/downloads
+      - ./media/downloads:/downloads
     restart: unless-stopped
     depends_on:
       - transmission
@@ -68,13 +83,16 @@ services:
 #      - TRANSMISSION_WEB_HOME=/combustion-release/ #optional
     volumes:
       - ./config/transmission:/config
-      - ./downloads:/downloads
-      - ./watch:/watch
+      - ./media/downloads:/downloads
+      - ./media/watch:/watch
     # ports:
     #   - "9091:9091"
     #   - "51413:51413"
     #   - "51413:51413/udp"
     restart: unless-stopped
+    depends_on:
+      tailscale-check:
+        condition: service_completed_successfully
   #  networks:
   #    - plex-network
 
@@ -89,9 +107,9 @@ services:
       - TZ=Europe/Lisbon
     volumes:
       - ./config/sonarr:/config
-      - ./tv:/tv
-      - ./downloads:/downloads
-      - ./anime:/anime
+      - ./media/tv:/tv
+      - ./media/downloads:/downloads
+      - ./media/anime:/anime
     # ports:
     #   - "8989:8989"
     restart: unless-stopped
@@ -111,8 +129,8 @@ services:
       - TZ=Europe/Lisbon
     volumes:
       - ./config/radarr:/config
-      - ./movies:/movies
-      - ./downloads:/downloads
+      - ./media/movies:/movies
+      - ./media/downloads:/downloads
     # ports:
     #   - "7878:7878"
     restart: unless-stopped
@@ -132,9 +150,9 @@ services:
       - TZ=Europe/Lisbon
     volumes:
       - ./config/overseerr:/config
-      - ./movies:/movies
-      - ./tv:/tv
-      - ./anime:/anime
+      - ./media/movies:/movies
+      - ./media/tv:/tv
+      - ./media/anime:/anime
     # ports:
     #   - "5055:5055"
     restart: unless-stopped
@@ -155,9 +173,9 @@ services:
       - TZ=Europe/Lisbon
     volumes:
       - ./config/bazarr:/config
-      - ./movies:/movies
-      - ./tv:/tv
-      - ./anime:/anime
+      - ./media/movies:/movies
+      - ./media/tv:/tv
+      - ./media/anime:/anime
     # ports:
     #   - "6767:6767"
     restart: unless-stopped
@@ -212,9 +230,9 @@ services:
 #      - PLEX_CLAIM= #optional
     volumes:
       - ./config/plex:/config
-      - ./tv:/tv
-      - ./movies:/movies
-      - ./anime:/anime
+      - ./media/tv:/tv
+      - ./media/movies:/movies
+      - ./media/anime:/anime
     restart: unless-stopped
 
 # networks:

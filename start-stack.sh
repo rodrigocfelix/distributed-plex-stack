@@ -6,7 +6,7 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 
 # Build the downloads-cleanup image explicitly with BuildKit
 echo "Building downloads-cleanup image with BuildKit..."
-docker build -t downloads-cleanup:latest -f Dockerfile.cleanup .
+docker build -t downloads-cleanup:latest -f /cleanup-service/Dockerfile.cleanup .
 
 # Start all services
 echo "Starting all services..."
